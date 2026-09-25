@@ -54,7 +54,6 @@ export function LoginForm() {
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
-                name="username"
                 autoComplete="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
@@ -66,7 +65,6 @@ export function LoginForm() {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="current-password"
                 value={password}

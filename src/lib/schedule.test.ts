@@ -10,6 +10,9 @@ test("midnight Sydney is covered across standard time and daylight saving", () =
   assert.equal(shouldRunScheduledPull(new Date("2026-01-14T13:00:00.000Z"), 0, 0), true);
   assert.equal(shouldRunScheduledPull(new Date("2026-01-14T14:00:00.000Z"), 0, 0), false);
   assert.deepEqual(cronExpressionsForSydneyHour(0, 0), ["0 13 * * *", "0 14 * * *"]);
+  assert.deepEqual(cronExpressionsForSydneyHour(5, 0), ["0 18 * * *", "0 19 * * *"]);
+  assert.equal(shouldRunScheduledPull(new Date("2026-09-24T19:00:00.000Z"), 5, 0), true);
+  assert.equal(shouldRunScheduledPull(new Date("2026-01-14T18:00:00.000Z"), 5, 0), true);
 });
 
 test("a one-month window keeps the ferry out and a two-year window brings the backfill in", () => {

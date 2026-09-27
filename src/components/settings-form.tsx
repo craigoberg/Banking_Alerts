@@ -121,7 +121,7 @@ export function SettingsForm() {
   const [hourText, minuteText] = time.split(":");
   const scheduleHour = Number(hourText);
   const scheduleMinute = Number(minuteText);
-  const deployedMatchesMidnight = scheduleHour === 0 && scheduleMinute === 0;
+  const deployedMatchesFive = scheduleHour === 5 && scheduleMinute === 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -224,16 +224,17 @@ export function SettingsForm() {
           <div className="mt-4 text-sm text-muted-foreground">
             <p>
               Vercel calls <code>/api/cron/daily</code> at{" "}
-              <code>0 13 * * *</code> and <code>0 14 * * *</code> UTC. Together those hit midnight
+              <code>0 18 * * *</code> and <code>0 19 * * *</code> UTC. Together those hit 5:00
               in Sydney all year. The route runs only when Sydney matches the time saved here.
             </p>
             <p className="mt-2">
               Cron for this time: {(data?.cron ?? []).join(" and ") || "not loaded"}.
             </p>
-            {deployedMatchesMidnight ? null : (
+            {deployedMatchesFive ? null : (
               <p className="mt-2 text-warning">
-                This deployment only fires at 13:00 and 14:00 UTC. A different Sydney time needs
-                those cron expressions in vercel.json, then a redeploy. Run pull now still works.
+                This deployment only fires at 18:00 and 19:00 UTC, which is 5:00 in Sydney. A
+                different Sydney time needs those cron expressions in vercel.json, then a redeploy.
+                Run pull now still works.
               </p>
             )}
           </div>

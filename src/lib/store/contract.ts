@@ -1,7 +1,9 @@
 import { isUnderThreshold } from "@/lib/alerts";
 import { filterTransactions } from "@/lib/search";
+import type { GroupLayout } from "@/lib/groups";
 import type {
   AccountCard,
+  AccountGroup,
   AccountRecord,
   AlertState,
   Bank,
@@ -61,6 +63,11 @@ export type Store = {
   startPull(input: { windowFrom: string; windowTo: string }): Promise<PullRun>;
   finishPull(id: string, status: string, detail: string): Promise<void>;
   latestPull(): Promise<PullRun | null>;
+  listGroups(): Promise<AccountGroup[]>;
+  createGroup(name: string): Promise<AccountGroup>;
+  updateGroup(id: string, input: { name?: string; collapsed?: boolean }): Promise<AccountGroup>;
+  deleteGroup(id: string): Promise<void>;
+  saveGroupLayout(layout: GroupLayout[]): Promise<void>;
 };
 
 export function cardsFromAccounts(
@@ -92,6 +99,8 @@ export function cardsFromAccounts(
       accountNumberMasked: account.accountNumberMasked,
       category: account.category,
       redbarkAccountId: account.redbarkAccountId,
+      groupId: account.groupId,
+      sortOrder: account.sortOrder,
     };
   });
 }

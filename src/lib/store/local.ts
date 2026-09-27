@@ -2,6 +2,15 @@ import { randomUUID } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { sydneyDate } from "@/lib/dates";
+import {
+  applyLayout,
+  assertUniqueGroupName,
+  destinationForDeletedGroup,
+  ensureMembership,
+  nextSortOrder,
+  normalizeGroupName,
+  orderedGroups,
+} from "@/lib/groups";
 import { verifyPassword } from "@/lib/passwords";
 import { buildSeed, type LocalData } from "@/lib/seed";
 import { cardsFromAccounts, StoreError, type Store } from "@/lib/store/contract";
@@ -35,7 +44,16 @@ async function readData(): Promise<LocalData> {
   const file = storePath();
   try {
     const raw = await readFile(/*turbopackIgnore: true*/ file, "utf8");
-    return JSON.parse(raw) as LocalData;
+    const parsed = JSON.parse(raw) as LocalData;
+    const before = JSON.stringify(parsed.groups ?? null) + JSON.stringify(
+      parsed.accounts?.map((account) => [account.groupId, account.sortOrder]),
+    );
+    const data = withGroups(parsed);
+    const after = JSON.stringify(data.groups) + JSON.stringify(
+      data.accounts.map((account) => [account.groupId, account.sortOrder]),
+    );
+    if (before !== after) await writeData(data);
+    return data;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== "ENOENT") throw error;
@@ -43,6 +61,13 @@ async function readData(): Promise<LocalData> {
     await writeData(seeded);
     return seeded;
   }
+}
+
+function withGroups(data: LocalData): LocalData {
+  if (!Array.isArray(data.groups)) data.groups = [];
+  const ensured = ensureMembership(data.groups, data.accounts);
+  data.groups = ensured.groups;
+  return data;
 }
 
 async function writeData(data: LocalData): Promise<void> {
@@ -127,6 +152,8 @@ export function localStore(): Store {
         const bank = data.banks.find((item) => item.id === bankId);
         if (!bank) throw new StoreError("That bank is not in the list.");
         const now = new Date().toISOString();
+        const group = orderedGroups(data.groups)[0];
+        if (!group) throw new StoreError("Add a group before adding an account.");
         const account: AccountRecord = {
           id: randomUUID(),
           bankId,
@@ -140,6 +167,8 @@ export function localStore(): Store {
           category: null,
           accountType: null,
           thresholdMinor: 0,
+          groupId: group.id,
+          sortOrder: nextSortOrder(data.accounts, group.id),
           createdAt: now,
           updatedAt: now,
         };
@@ -252,8 +281,8 @@ export function localStore(): Store {
           ] as const;
         }),
       );
-      return cardsFromAccounts(data.accounts, balances).sort((a, b) =>
-        a.nickname.localeCompare(b.nickname),
+      return cardsFromAccounts(data.accounts, balances).sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.nickname.localeCompare(b.nickname),
       );
     },
     async listTransactions(filter) {
@@ -385,6 +414,66 @@ export function localStore(): Store {
     async latestPull() {
       const data = await readData();
       return data.pullRuns[0] ?? null;
+    },
+    async listGroups() {
+      const data = await readData();
+      return orderedGroups(data.groups);
+    },
+    async createGroup(name) {
+      return withLock(async () => {
+        const data = await readData();
+        const trimmed = normalizeGroupName(name);
+        assertUniqueGroupName(data.groups, trimmed);
+        const group = {
+          id: randomUUID(),
+          name: trimmed,
+          sortOrder: data.groups.reduce((max, item) => Math.max(max, item.sortOrder), -1) + 1,
+          collapsed: false,
+        };
+        data.groups.push(group);
+        await writeData(data);
+        return group;
+      });
+    },
+    async updateGroup(id, input) {
+      return withLock(async () => {
+        const data = await readData();
+        const group = data.groups.find((item) => item.id === id);
+        if (!group) throw new StoreError("That group is not in the list.", 404);
+        if (input.name !== undefined) {
+          const trimmed = normalizeGroupName(input.name);
+          assertUniqueGroupName(data.groups, trimmed, id);
+          group.name = trimmed;
+        }
+        if (input.collapsed !== undefined) group.collapsed = input.collapsed;
+        if (input.name === undefined && input.collapsed === undefined) {
+          throw new StoreError("Nothing to change.");
+        }
+        await writeData(data);
+        return group;
+      });
+    },
+    async deleteGroup(id) {
+      await withLock(async () => {
+        const data = await readData();
+        const destination = destinationForDeletedGroup(data.groups, id);
+        let order = nextSortOrder(data.accounts, destination.id);
+        for (const account of data.accounts) {
+          if (account.groupId !== id) continue;
+          account.groupId = destination.id;
+          account.sortOrder = order;
+          order += 1;
+        }
+        data.groups = data.groups.filter((group) => group.id !== id);
+        await writeData(data);
+      });
+    },
+    async saveGroupLayout(layout) {
+      await withLock(async () => {
+        const data = await readData();
+        applyLayout(data.groups, data.accounts, layout);
+        await writeData(data);
+      });
     },
   };
 }

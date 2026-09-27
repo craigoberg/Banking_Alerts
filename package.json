@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 47231",
     "lint": "eslint",
-    "test": "tsx --test src/lib/alerts.test.ts src/lib/search.test.ts src/lib/schedule.test.ts src/lib/money.test.ts src/lib/store.local.test.ts",
+    "test": "tsx --test src/lib/alerts.test.ts src/lib/search.test.ts src/lib/schedule.test.ts src/lib/money.test.ts src/lib/dates.test.ts src/lib/store.local.test.ts",
     "seed-login": "tsx scripts/seed-login.ts"
   },
   "dependencies": {

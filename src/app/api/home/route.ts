@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { DEFAULT_PULL_WINDOW_DAYS } from "@/lib/constants";
-import { sydneyDate, windowFor } from "@/lib/dates";
+import { currentMonthWindow, sydneyDate } from "@/lib/dates";
 import { jsonError, requireUser, unauthorized } from "@/lib/http";
 import { getStore, searchTransactions } from "@/lib/store";
 
@@ -10,7 +9,7 @@ export async function GET(request: Request) {
     if (!username) return unauthorized();
     const url = new URL(request.url);
     const today = sydneyDate();
-    const fallback = windowFor(today, DEFAULT_PULL_WINDOW_DAYS);
+    const fallback = currentMonthWindow(today);
     const from = url.searchParams.get("from") || fallback.from;
     const to = url.searchParams.get("to") || fallback.to;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
@@ -22,7 +21,7 @@ export async function GET(request: Request) {
     const accountId = url.searchParams.get("accountId");
     const q = url.searchParams.get("q") ?? "";
     const store = await getStore();
-    const [cards, transactions, latestPull] = await Promise.all([
+    const [cards, transactions, latestPull, groups] = await Promise.all([
       store.listCards(),
       searchTransactions(store, {
         accountId: accountId && accountId !== "all" ? accountId : null,
@@ -31,13 +30,16 @@ export async function GET(request: Request) {
         q,
       }),
       store.latestPull(),
+      store.listGroups(),
     ]);
     return NextResponse.json({
       from,
       to,
+      today,
       q,
       accountId: accountId && accountId !== "all" ? accountId : "all",
       cards,
+      groups,
       transactions,
       latestPull,
     });

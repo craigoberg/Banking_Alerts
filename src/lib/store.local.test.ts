@@ -32,6 +32,30 @@ test("local demo signs in and searches every column", async () => {
     assert.equal(matches.length, 1);
     assert.equal(matches[0]?.nickname, "House");
     assert.equal(matches[0]?.reference, "HOUSE-RENT");
+
+    const groups = await store.listGroups();
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0]?.name, "Accounts");
+    assert.equal(groups[0]?.collapsed, false);
+    assert.equal(cards.every((card) => card.groupId === groups[0]?.id), true);
+    const created = await store.createGroup("Spending");
+    const bills = cards.find((card) => card.nickname === "Bills");
+    assert.ok(bills);
+    await store.saveGroupLayout([
+      { id: groups[0]!.id, accountIds: cards.filter((card) => card.id !== bills.id).map((card) => card.id) },
+      { id: created.id, accountIds: [bills.id] },
+    ]);
+    await store.updateGroup(created.id, { collapsed: true, name: "Spending" });
+    const moved = (await store.listCards()).find((card) => card.nickname === "Bills");
+    assert.equal(moved?.groupId, created.id);
+    assert.equal(moved?.sortOrder, 0);
+    const saved = await store.listGroups();
+    assert.equal(saved.find((group) => group.id === created.id)?.collapsed, true);
+    await store.deleteGroup(created.id);
+    const restored = (await store.listCards()).find((card) => card.nickname === "Bills");
+    assert.equal(restored?.groupId, groups[0]?.id);
+    assert.equal((await store.listGroups()).some((group) => group.name === "Spending"), false);
+    await assert.rejects(() => store.deleteGroup(groups[0]!.id), /Keep at least one group/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

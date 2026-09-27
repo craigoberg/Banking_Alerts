@@ -6,9 +6,19 @@ import {
   DEFAULT_SCHEDULE_MINUTE,
   SCHEDULE_TIMEZONE,
 } from "@/lib/constants";
+import {
+  applyLayout,
+  assertUniqueGroupName,
+  destinationForDeletedGroup,
+  nextSortOrder,
+  normalizeGroupName,
+  orderedGroups,
+} from "@/lib/groups";
+import { STARTING_GROUP_NAME } from "@/lib/constants";
 import { verifyPassword } from "@/lib/passwords";
 import { cardsFromAccounts, StoreError, type Store } from "@/lib/store/contract";
 import type {
+  AccountGroup,
   AccountRecord,
   AlertState,
   Bank,
@@ -64,6 +74,8 @@ function mapAccount(row: {
   account_type: string | null;
   created_at: string;
   updated_at: string;
+  group_id: string;
+  sort_order: number;
   banks: BankJoin;
   thresholds: ThresholdJoin;
 }): AccountRecord {
@@ -82,13 +94,29 @@ function mapAccount(row: {
     category: row.category,
     accountType: row.account_type,
     thresholdMinor: threshold?.amount_minor ?? 0,
+    groupId: row.group_id,
+    sortOrder: row.sort_order ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 const ACCOUNT_SELECT =
-  "id, bank_id, nickname, redbark_account_id, provider_name, institution_name, account_number_masked, currency, category, account_type, created_at, updated_at, banks!inner(name), thresholds(amount_minor)";
+  "id, bank_id, nickname, redbark_account_id, provider_name, institution_name, account_number_masked, currency, category, account_type, group_id, sort_order, created_at, updated_at, banks!inner(name), thresholds(amount_minor)";
+
+function mapGroup(row: {
+  id: string;
+  name: string;
+  sort_order: number;
+  collapsed: boolean;
+}): AccountGroup {
+  return {
+    id: row.id,
+    name: row.name,
+    sortOrder: row.sort_order,
+    collapsed: row.collapsed,
+  };
+}
 
 function mapPull(row: {
   id: string;
@@ -178,9 +206,16 @@ export function supabaseStore(): Store {
         .maybeSingle();
       fail(bankError, "Could not find that bank.");
       if (!bank) throw new StoreError("That bank is not in the list.");
+      const placement = await nextAccountPlacement(db);
       const { data, error } = await db
         .from("accounts")
-        .insert({ bank_id: bankId, nickname, currency: "aud" })
+        .insert({
+          bank_id: bankId,
+          nickname,
+          currency: "aud",
+          group_id: placement.groupId,
+          sort_order: placement.sortOrder,
+        })
         .select("id, created_at, updated_at")
         .single();
       fail(error, "Could not add the account.");
@@ -206,6 +241,8 @@ export function supabaseStore(): Store {
         category: null,
         accountType: null,
         thresholdMinor: 0,
+        groupId: placement.groupId,
+        sortOrder: placement.sortOrder,
         createdAt: (data!.created_at as string) ?? now,
         updatedAt: (data!.updated_at as string) ?? now,
       } satisfies AccountRecord;
@@ -355,8 +392,8 @@ export function supabaseStore(): Store {
           },
         ]),
       );
-      return cardsFromAccounts(accounts, balances).sort((a, b) =>
-        a.nickname.localeCompare(b.nickname),
+      return cardsFromAccounts(accounts, balances).sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.nickname.localeCompare(b.nickname),
       );
     },
     async listTransactions(filter) {
@@ -524,5 +561,116 @@ export function supabaseStore(): Store {
       fail(error, "Could not read the last pull.");
       return data ? mapPull(data as never) : null;
     },
+    async listGroups() {
+      return readGroups(db);
+    },
+    async createGroup(name) {
+      const trimmed = normalizeGroupName(name);
+      const groups = await readGroups(db);
+      assertUniqueGroupName(groups, trimmed);
+      const sortOrder = groups.reduce((max, group) => Math.max(max, group.sortOrder), -1) + 1;
+      const { data, error } = await db
+        .from("account_groups")
+        .insert({ name: trimmed, sort_order: sortOrder, collapsed: false })
+        .select("id, name, sort_order, collapsed")
+        .single();
+      fail(error, "Could not add the group.");
+      return mapGroup(data as never);
+    },
+    async updateGroup(id, input) {
+      const patch: { name?: string; collapsed?: boolean } = {};
+      if (input.name !== undefined) {
+        const trimmed = normalizeGroupName(input.name);
+        const groups = await readGroups(db);
+        assertUniqueGroupName(groups, trimmed, id);
+        patch.name = trimmed;
+      }
+      if (input.collapsed !== undefined) patch.collapsed = input.collapsed;
+      if (patch.name === undefined && patch.collapsed === undefined) {
+        throw new StoreError("Nothing to change.");
+      }
+      const { data, error } = await db
+        .from("account_groups")
+        .update(patch)
+        .eq("id", id)
+        .select("id, name, sort_order, collapsed")
+        .maybeSingle();
+      fail(error, "Could not update the group.");
+      if (!data) throw new StoreError("That group is not in the list.", 404);
+      return mapGroup(data as never);
+    },
+    async deleteGroup(id) {
+      const groups = await readGroups(db);
+      const destination = destinationForDeletedGroup(groups, id);
+      const accounts = await this.listAccounts();
+      let order = nextSortOrder(accounts, destination.id);
+      for (const account of accounts) {
+        if (account.groupId !== id) continue;
+        const moved = await db
+          .from("accounts")
+          .update({ group_id: destination.id, sort_order: order, updated_at: new Date().toISOString() })
+          .eq("id", account.id);
+        fail(moved.error, "Could not move the accounts out of that group.");
+        order += 1;
+      }
+      const { error } = await db.from("account_groups").delete().eq("id", id);
+      fail(error, "Could not delete the group.");
+    },
+    async saveGroupLayout(layout) {
+      const groups = await readGroups(db);
+      const accounts = await this.listAccounts();
+      applyLayout(groups, accounts, layout);
+      for (const group of groups) {
+        const saved = await db
+          .from("account_groups")
+          .update({ sort_order: group.sortOrder })
+          .eq("id", group.id);
+        fail(saved.error, "Could not save the group order.");
+      }
+      const updatedAt = new Date().toISOString();
+      for (const account of accounts) {
+        const saved = await db
+          .from("accounts")
+          .update({
+            group_id: account.groupId,
+            sort_order: account.sortOrder,
+            updated_at: updatedAt,
+          })
+          .eq("id", account.id);
+        fail(saved.error, "Could not save the account order.");
+      }
+    },
   };
+}
+
+async function readGroups(db: SupabaseClient): Promise<AccountGroup[]> {
+  const { data, error } = await db
+    .from("account_groups")
+    .select("id, name, sort_order, collapsed")
+    .order("sort_order");
+  fail(error, "Could not list groups.");
+  return orderedGroups((data ?? []).map((row) => mapGroup(row as never)));
+}
+
+async function nextAccountPlacement(db: SupabaseClient): Promise<{ groupId: string; sortOrder: number }> {
+  let groups = await readGroups(db);
+  if (groups.length === 0) {
+    const created = await db
+      .from("account_groups")
+      .insert({ name: STARTING_GROUP_NAME, sort_order: 0, collapsed: false })
+      .select("id, name, sort_order, collapsed")
+      .single();
+    fail(created.error, "Could not add the Accounts group.");
+    groups = [mapGroup(created.data as never)];
+  }
+  const group = orderedGroups(groups)[0];
+  const { data, error } = await db
+    .from("accounts")
+    .select("sort_order")
+    .eq("group_id", group.id)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  fail(error, "Could not place the account.");
+  const latest = data?.[0]?.sort_order;
+  return { groupId: group.id, sortOrder: typeof latest === "number" ? latest + 1 : 0 };
 }

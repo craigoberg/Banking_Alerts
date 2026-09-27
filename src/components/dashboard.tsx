@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AccountGroups } from "@/components/account-groups";
+import { MonthScroller } from "@/components/month-scroller";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,14 +26,16 @@ import {
 } from "@/components/ui/table";
 import { formatDateLabel, formatSydney } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
-import type { AccountCard, PullRun, TransactionRow } from "@/lib/types";
+import type { AccountCard, AccountGroup, PullRun, TransactionRow } from "@/lib/types";
 
 type HomePayload = {
   from: string;
   to: string;
+  today: string;
   q: string;
   accountId: string;
   cards: AccountCard[];
+  groups: AccountGroup[];
   transactions: TransactionRow[];
   latestPull: PullRun | null;
 };
@@ -92,6 +96,21 @@ export function Dashboard() {
     }, 250);
   }
 
+  async function mutate(url: string, init: { method: string; body?: unknown }) {
+    const response = await fetch(url, {
+      method: init.method,
+      headers: init.body ? { "content-type": "application/json" } : undefined,
+      body: init.body ? JSON.stringify(init.body) : undefined,
+    });
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    if (response.status === 401) {
+      router.push("/login");
+      return;
+    }
+    if (!response.ok) throw new Error(body.error ?? "Could not update groups.");
+    await load(filters.current);
+  }
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -150,8 +169,9 @@ export function Dashboard() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-medium">Balances</h1>
         <p className="text-sm text-muted-foreground">
-          A card is marked Under while that balance is under its threshold. Search checks every
-          column, including the reference, merchant, and amount.
+          A card is marked Under while that balance is under its threshold. Drag a card to reorder
+          it or move it into another group. Search checks every column, including the reference,
+          merchant, and amount.
         </p>
         {data?.latestPull ? (
           <p className="text-sm text-muted-foreground">
@@ -171,15 +191,20 @@ export function Dashboard() {
             <Button render={<Link href="/accounts" />}>Add an account</Button>
           </CardContent>
         </Card>
-      ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {cards.map((card) => (
-            <li key={card.id}>
-              <AccountBalanceCard card={card} />
-            </li>
-          ))}
-        </ul>
-      )}
+      ) : null}
+      <AccountGroups
+        groups={data?.groups ?? []}
+        cards={cards}
+        onCreate={(groupName) => mutate("/api/groups", { method: "POST", body: { name: groupName } })}
+        onRename={(id, groupName) =>
+          mutate(`/api/groups/${id}`, { method: "PATCH", body: { name: groupName } })
+        }
+        onDelete={(id) => mutate(`/api/groups/${id}`, { method: "DELETE" })}
+        onToggle={(id, collapsed) =>
+          mutate(`/api/groups/${id}`, { method: "PATCH", body: { collapsed } })
+        }
+        onLayout={(layout) => mutate("/api/groups/layout", { method: "PUT", body: { groups: layout } })}
+      />
 
       <section className="flex flex-col gap-4">
         <div className="flex items-end justify-between gap-3">
@@ -191,7 +216,7 @@ export function Dashboard() {
             {error}
           </p>
         ) : null}
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(13rem,1.35fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.15fr)]">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="account">Account</Label>
             <Select
@@ -215,6 +240,16 @@ export function Dashboard() {
               </SelectContent>
             </Select>
           </div>
+          <MonthScroller
+            from={from}
+            to={to}
+            today={data?.today || to || from}
+            onChange={(nextFrom, nextTo) => {
+              setFrom(nextFrom);
+              setTo(nextTo);
+              schedule({ accountId, from: nextFrom, to: nextTo, q: query });
+            }}
+          />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="from">From</Label>
             <Input
@@ -284,44 +319,6 @@ export function Dashboard() {
       </section>
     </div>
   );
-}
-
-function AccountBalanceCard({ card }: { card: AccountCard }) {
-  const tone =
-    card.under === true ? "border-l-alarm" : card.under === false ? "border-l-ok" : "border-l-warning";
-  return (
-    <Card className={`border-l-4 ${tone}`}>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <CardTitle>{card.nickname}</CardTitle>
-          <ThresholdMark under={card.under} />
-        </div>
-        <p className="text-sm text-muted-foreground">{card.bankName}</p>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-1">
-        <p className="text-2xl font-medium">
-          {card.currentAmount === null ? "No balance" : formatMoney(card.currentAmount, card.currency)}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Threshold {formatMoney(card.thresholdMinor, card.currency)}
-        </p>
-        {card.accountNumberMasked ? (
-          <p className="text-sm text-muted-foreground">Ending {card.accountNumberMasked}</p>
-        ) : (
-          <p className="text-sm text-muted-foreground">Not linked to RedBark yet</p>
-        )}
-        {card.freshness === "stale" || card.freshness === "unavailable" ? (
-          <p className="text-sm text-warning">Balance {card.freshness}</p>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ThresholdMark({ under }: { under: boolean | null }) {
-  if (under === true) return <span className="text-sm font-medium text-alarm">Under</span>;
-  if (under === false) return <span className="text-sm font-medium text-ok">Above</span>;
-  return <span className="text-sm font-medium text-warning">No balance</span>;
 }
 
 function TransactionCard({ row }: { row: TransactionRow }) {

@@ -28,7 +28,8 @@ npm run lint
 ## What you can do
 
 - Balances are cards. A card is marked Under while the balance is under that account’s threshold.
-- Transactions filter by account and date. Search matches every column, including description, reference, merchant, category, status, direction, and amount.
+- Cards start in one group named Accounts. You can create, rename, and delete groups, drag cards to reorder them or move them between groups, and collapse a group. Collapsing hides the cards and keeps the header. Transactions stay in one list.
+- Transactions filter by account, month, and date. The month control uses Australia/Sydney. The current month runs from the 1st through today. Earlier months are the full calendar month, and the control does not move into a future month. Search matches every column, including description, reference, merchant, category, status, direction, and amount.
 - Accounts can be added, renamed, or removed. Banks are records too. The first bank is Commonwealth Bank.
 - Settings change the alert recipient (default `craig@oberg.com.au`, from `alert@oberg.com.au`), the Australia/Sydney time, and the pull window.
 - The first pull covers 31 days. Raise the window up to 731 days for a later backfill of about two years, then use Run pull now.
@@ -40,7 +41,9 @@ Create a Supabase database in Craig’s existing account, region Oceania (Sydney
 
 `supabase/migrations/20260925120000_banking_alerts.sql`
 
-That creates banks, accounts, balances, transactions, thresholds, logins, alert state, settings, discovered RedBark accounts, pull history, and the email log. It seeds Commonwealth Bank and the seven nicknames. It does not insert a password or an API key.
+`supabase/migrations/20260927120000_account_groups.sql`
+
+The first file creates banks, accounts, balances, transactions, thresholds, logins, alert state, settings, discovered RedBark accounts, pull history, and the email log. It seeds Commonwealth Bank and the seven nicknames. It does not insert a password or an API key. The second file adds account groups and places those nicknames in a group named Accounts. Run both, in that order.
 
 Then set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and create the real login:
 

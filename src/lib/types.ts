@@ -17,8 +17,17 @@ export type AccountRecord = {
   category: string | null;
   accountType: string | null;
   thresholdMinor: number;
+  groupId: string;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AccountGroup = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  collapsed: boolean;
 };
 
 export type DiscoveredAccount = {
@@ -57,6 +66,8 @@ export type AccountCard = {
   accountNumberMasked: string | null;
   category: string | null;
   redbarkAccountId: string | null;
+  groupId: string;
+  sortOrder: number;
 };
 
 export type TransactionRow = {

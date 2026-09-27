@@ -10,6 +10,9 @@ export const STARTING_NICKNAMES = [
   "Alfred",
 ] as const;
 
+export const STARTING_GROUP_NAME = "Accounts";
+export const STARTING_GROUP_ID = "33333333-3333-4333-8333-333333333301";
+
 export const ALERT_FROM = "alert@oberg.com.au";
 export const DEFAULT_RECIPIENT = "craig@oberg.com.au";
 export const SCHEDULE_TIMEZONE = "Australia/Sydney";

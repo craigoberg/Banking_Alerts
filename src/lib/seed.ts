@@ -17,7 +17,9 @@ import {
   MOCK_INSTITUTION,
   transactionsInWindow,
 } from "@/lib/redbark/mock-data";
+import { startingGroup } from "@/lib/groups";
 import type {
+  AccountGroup,
   AccountRecord,
   AlertState,
   Bank,
@@ -65,6 +67,7 @@ export type LoginRow = {
 
 export type LocalData = {
   banks: Bank[];
+  groups: AccountGroup[];
   accounts: AccountRecord[];
   balances: BalanceRow[];
   transactions: TransactionStored[];
@@ -119,6 +122,8 @@ export function buildSeed(today: string, now = new Date().toISOString()): LocalD
     category: "banking",
     accountType: spec.accountType,
     thresholdMinor: spec.thresholdMinor,
+    groupId: startingGroup().id,
+    sortOrder: index,
     createdAt,
     updatedAt: createdAt,
   }));
@@ -186,6 +191,7 @@ export function buildSeed(today: string, now = new Date().toISOString()): LocalD
   };
   return {
     banks: [bank],
+    groups: [startingGroup()],
     accounts,
     balances,
     transactions,

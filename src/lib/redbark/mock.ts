@@ -43,8 +43,11 @@ export function createMockClient(today: string) {
         },
       };
     },
-    async listCommonwealthAccounts(): Promise<RedbarkAccountItem[]> {
+    async listAccounts(): Promise<RedbarkAccountItem[]> {
       return MOCK_ACCOUNTS.map(accountItem);
+    },
+    async listCommonwealthAccounts(): Promise<RedbarkAccountItem[]> {
+      return this.listAccounts();
     },
     async balances(accountIds: string[]): Promise<RedbarkBalance[]> {
       return accountIds.flatMap((id) => {

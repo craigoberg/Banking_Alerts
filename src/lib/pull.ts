@@ -3,6 +3,7 @@ import { ALERT_FROM, FIRST_BANK_NAME } from "@/lib/constants";
 import { sydneyDate, windowFor } from "@/lib/dates";
 import { deliverEmail, resolvedEmail, underThresholdEmail } from "@/lib/postmark";
 import { getRedbarkClient } from "@/lib/redbark";
+import { isCommonwealthInstitution } from "@/lib/redbark/mock-data";
 import { RedbarkError } from "@/lib/redbark/client";
 import { shouldRunScheduledPull } from "@/lib/schedule";
 import { getStore } from "@/lib/store";
@@ -45,7 +46,22 @@ export async function runDailyPull(source: "cron" | "manual"): Promise<PullResul
     }
     if (!live) notes.push("Using sample Commonwealth Bank data.");
 
-    const remote = await client.listCommonwealthAccounts();
+    const remoteAll = await client.listAccounts();
+    const institutionNames = [
+      ...new Set(
+        remoteAll
+          .map((account) => account.institution?.name)
+          .filter((name): name is string => Boolean(name)),
+      ),
+    ];
+    notes.push(
+      institutionNames.length > 0
+        ? `RedBark institutions: ${institutionNames.join(", ")}.`
+        : "RedBark returned no accounts.",
+    );
+    const remote = remoteAll.filter((account) =>
+      isCommonwealthInstitution(account.institution?.name, account.institution?.id),
+    );
     const banks = await store.listBanks();
     const bank =
       banks.find((item) => item.name.toLowerCase() === FIRST_BANK_NAME.toLowerCase()) ??

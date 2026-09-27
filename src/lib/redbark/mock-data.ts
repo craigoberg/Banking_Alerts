@@ -351,8 +351,12 @@ export const MOCK_TRANSACTIONS: MockTransactionSpec[] = [
   },
 ];
 
-export function isCommonwealthInstitution(name: string | null | undefined): boolean {
-  return Boolean(name && name.toLowerCase().includes("commonwealth"));
+export function isCommonwealthInstitution(
+  name: string | null | undefined,
+  id?: string | null,
+): boolean {
+  const text = `${name ?? ""} ${id ?? ""}`.toLowerCase();
+  return text.includes("commonwealth") || text.includes("commbank") || /\bcba\b/.test(text);
 }
 
 export function mockAccountByNickname(nickname: string): MockAccountSpec | undefined {

@@ -80,12 +80,14 @@ export function createLiveClient(key: string) {
     async me(): Promise<RedbarkMe> {
       return redbarkFetch<RedbarkMe>(`${REDBARK_BASE}/me`, key);
     },
+    async listAccounts(): Promise<RedbarkAccountItem[]> {
+      return listPages<RedbarkAccountItem>(`${REDBARK_BASE}/accounts?limit=100`, key);
+    },
     async listCommonwealthAccounts(): Promise<RedbarkAccountItem[]> {
-      const accounts = await listPages<RedbarkAccountItem>(
-        `${REDBARK_BASE}/accounts?limit=100`,
-        key,
+      const accounts = await this.listAccounts();
+      return accounts.filter((account) =>
+        isCommonwealthInstitution(account.institution?.name, account.institution?.id),
       );
-      return accounts.filter((account) => isCommonwealthInstitution(account.institution?.name));
     },
     async balances(accountIds: string[]): Promise<RedbarkBalance[]> {
       if (accountIds.length === 0) return [];

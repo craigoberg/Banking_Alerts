@@ -18,7 +18,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="border-b border-border">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex w-full flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 xl:px-8">
           <div>
             <Link href="/" className="text-lg font-medium tracking-tight">
               Banking Alerts
@@ -55,7 +55,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6">{children}</main>
+      <main className="mx-auto flex w-full flex-1 flex-col px-4 py-6 sm:px-6 xl:px-8">{children}</main>
     </div>
   );
 }

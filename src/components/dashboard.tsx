@@ -345,39 +345,41 @@ function TransactionCard({ row }: { row: TransactionRow }) {
 
 function TransactionTable({ rows }: { rows: TransactionRow[] }) {
   return (
-    <Table>
+    <Table className="table-fixed">
       <TableHeader>
         <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>Account</TableHead>
-          <TableHead>Bank</TableHead>
-          <TableHead>Description</TableHead>
-          <TableHead>Reference</TableHead>
-          <TableHead>Merchant</TableHead>
-          <TableHead>Category</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-right">Amount</TableHead>
+          <TableHead className="w-[8%]">Date</TableHead>
+          <TableHead className="w-[9%]">Account</TableHead>
+          <TableHead className="w-[12%]">Bank</TableHead>
+          <TableHead className="w-[22%]">Description</TableHead>
+          <TableHead className="w-[14%]">Reference</TableHead>
+          <TableHead className="w-[12%]">Merchant</TableHead>
+          <TableHead className="w-[9%]">Category</TableHead>
+          <TableHead className="w-[7%]">Status</TableHead>
+          <TableHead className="w-[7%] text-right">Amount</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.id}>
-            <TableCell>{formatDateLabel(row.date)}</TableCell>
-            <TableCell>{row.nickname}</TableCell>
-            <TableCell>{row.bankName}</TableCell>
-            <TableCell>
-              <div>{row.description}</div>
+            <TableCell className="whitespace-nowrap">{formatDateLabel(row.date)}</TableCell>
+            <TableCell className="whitespace-normal">{row.nickname}</TableCell>
+            <TableCell className="whitespace-normal">{row.bankName}</TableCell>
+            <TableCell className="whitespace-normal">
+              <div className="break-words">{row.description}</div>
               {row.extendedDescription ? (
-                <div className="text-muted-foreground">{row.extendedDescription}</div>
+                <div className="break-words text-muted-foreground">{row.extendedDescription}</div>
               ) : null}
             </TableCell>
-            <TableCell>{row.reference ?? "—"}</TableCell>
-            <TableCell>{row.merchantName ?? "—"}</TableCell>
-            <TableCell>{row.category ?? row.providerCategory ?? "—"}</TableCell>
-            <TableCell>
+            <TableCell className="whitespace-normal break-words">{row.reference ?? "—"}</TableCell>
+            <TableCell className="whitespace-normal break-words">{row.merchantName ?? "—"}</TableCell>
+            <TableCell className="whitespace-normal break-words">
+              {row.category ?? row.providerCategory ?? "—"}
+            </TableCell>
+            <TableCell className="whitespace-normal">
               {[row.status, row.direction].filter(Boolean).join(" · ") || "—"}
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="whitespace-nowrap text-right">
               <Amount amount={row.amountMinor} currency={row.currency} />
             </TableCell>
           </TableRow>
@@ -397,7 +399,7 @@ function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
       <div className="h-8 w-40 animate-pulse rounded-lg bg-muted" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={index} className="h-36 animate-pulse rounded-xl bg-card" />
         ))}

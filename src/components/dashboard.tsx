@@ -24,8 +24,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDateLabel, formatSydney } from "@/lib/dates";
-import { formatMoney } from "@/lib/money";
+import { earliestSelectableDate, formatDateLabel, formatSydney } from "@/lib/dates";
+import { formatMoney, sumAmountTotals } from "@/lib/money";
 import type { AccountCard, AccountGroup, PullRun, TransactionRow } from "@/lib/types";
 
 type HomePayload = {
@@ -163,6 +163,8 @@ export function Dashboard() {
 
   const cards = data?.cards ?? [];
   const transactions = data?.transactions ?? [];
+  const today = data?.today || "";
+  const earliest = today ? earliestSelectableDate(today) : "";
 
   return (
     <div className="flex flex-col gap-8">
@@ -255,9 +257,13 @@ export function Dashboard() {
             <Input
               id="from"
               type="date"
+              min={earliest || undefined}
+              max={today || undefined}
               value={from}
               onChange={(event) => {
                 const value = event.target.value;
+                if (earliest && value && value < earliest) return;
+                if (today && value && value > today) return;
                 setFrom(value);
                 schedule({ accountId, from: value, to, q: query });
               }}
@@ -269,9 +275,13 @@ export function Dashboard() {
             <Input
               id="to"
               type="date"
+              min={earliest || undefined}
+              max={today || undefined}
               value={to}
               onChange={(event) => {
                 const value = event.target.value;
+                if (earliest && value && value < earliest) return;
+                if (today && value && value > today) return;
                 setTo(value);
                 schedule({ accountId, from, to: value, q: query });
               }}
@@ -293,6 +303,8 @@ export function Dashboard() {
             />
           </div>
         </div>
+
+        <TransactionTotals rows={transactions} />
 
         {transactions.length === 0 ? (
           <Card>
@@ -317,6 +329,40 @@ export function Dashboard() {
           </>
         )}
       </section>
+    </div>
+  );
+}
+
+function TransactionTotals({ rows }: { rows: TransactionRow[] }) {
+  const totals = sumAmountTotals(rows);
+  const shown = totals.length > 0 ? totals : [{ currency: "aud", incomeMinor: 0, expenseMinor: 0 }];
+  return (
+    <div className="flex flex-col gap-3" aria-live="polite">
+      {shown.map((total) => (
+        <div
+          key={total.currency}
+          className="flex flex-col gap-3 rounded-xl bg-card px-4 py-3 ring-1 ring-foreground/10 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-sm text-muted-foreground">
+            Totals for the rows in this view
+            {shown.length > 1 ? ` · ${total.currency.toUpperCase()}` : ""}
+          </p>
+          <div className="grid grid-cols-2 gap-6 sm:min-w-80">
+            <div>
+              <p className="text-sm text-muted-foreground">Income</p>
+              <p className="text-xl font-medium tabular-nums text-ok">
+                {formatMoney(total.incomeMinor, total.currency)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Expenses</p>
+              <p className="text-xl font-medium tabular-nums">
+                {formatMoney(total.expenseMinor, total.currency)}
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -24,6 +24,24 @@ export function dollarsToMinor(value: string): number | null {
   return negative ? -minor : minor;
 }
 
+export type AmountTotals = {
+  currency: string;
+  incomeMinor: number;
+  expenseMinor: number;
+};
+
+export function sumAmountTotals(rows: { amountMinor: number; currency: string }[]): AmountTotals[] {
+  const totals = new Map<string, AmountTotals>();
+  for (const row of rows) {
+    const currency = row.currency.trim().toLowerCase() || "aud";
+    const current = totals.get(currency) ?? { currency, incomeMinor: 0, expenseMinor: 0 };
+    if (row.amountMinor > 0) current.incomeMinor += row.amountMinor;
+    else if (row.amountMinor < 0) current.expenseMinor += row.amountMinor;
+    totals.set(currency, current);
+  }
+  return [...totals.values()];
+}
+
 export function minorToDollarInput(amountMinor: number): string {
   const negative = amountMinor < 0;
   const abs = Math.abs(amountMinor);

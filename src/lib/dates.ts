@@ -1,4 +1,4 @@
-import { MAX_PULL_WINDOW_DAYS } from "@/lib/constants";
+import { LOOKBACK_YEARS, MAX_PULL_WINDOW_DAYS } from "@/lib/constants";
 
 export function sydneyDate(date = new Date()): string {
   return sydneyClock(date).date;
@@ -36,8 +36,36 @@ export function addDays(isoDate: string, days: number): string {
 }
 
 export function windowFor(today: string, days: number): { from: string; to: string } {
-  const clamped = Math.min(MAX_PULL_WINDOW_DAYS, Math.max(1, Math.trunc(days)));
+  const clamped = Math.min(maxPullWindowDays(today), Math.max(1, Math.trunc(days)));
   return { from: addDays(today, -(clamped - 1)), to: today };
+}
+
+export function earliestSelectableDate(today: string): string {
+  return addCalendarYears(today, -LOOKBACK_YEARS);
+}
+
+export function maxPullWindowDays(today: string): number {
+  const earliest = earliestSelectableDate(today);
+  const span = daysBetween(earliest, today) + 1;
+  if (!Number.isFinite(span) || span < 1) return MAX_PULL_WINDOW_DAYS;
+  return Math.min(MAX_PULL_WINDOW_DAYS, span);
+}
+
+function addCalendarYears(isoDateValue: string, years: number): string {
+  const parsed = parseIsoDate(isoDateValue);
+  if (!parsed) return isoDateValue;
+  const year = parsed.year + years;
+  const day = Math.min(parsed.day, lastDayOfMonth(year, parsed.month));
+  return isoDate(year, parsed.month, day);
+}
+
+function daysBetween(from: string, to: string): number {
+  const start = parseIsoDate(from);
+  const end = parseIsoDate(to);
+  if (!start || !end) return MAX_PULL_WINDOW_DAYS - 1;
+  const startUtc = Date.UTC(start.year, start.month - 1, start.day);
+  const endUtc = Date.UTC(end.year, end.month - 1, end.day);
+  return Math.round((endUtc - startUtc) / 86_400_000);
 }
 
 export function formatDateLabel(isoDate: string): string {
@@ -149,7 +177,9 @@ export function stepMonth(from: string, today: string, delta: -1 | 1): MonthRang
   const dest = fromMonthIndex(monthIndex(anchor.year, anchor.month) + delta);
   if (dest.year < 1) return null;
   if (monthIndex(dest.year, dest.month) > monthIndex(current.year, current.month)) return null;
-  return monthWindow(dest.year, dest.month, today);
+  const range = monthWindow(dest.year, dest.month, today);
+  if (range.from < earliestSelectableDate(today)) return null;
+  return range;
 }
 
 export function formatSydney(iso: string | null): string {

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ALERT_FROM, MAX_PULL_WINDOW_DAYS } from "@/lib/constants";
-import { formatSydney } from "@/lib/dates";
+import { formatDateLabel, formatSydney } from "@/lib/dates";
 import type { IntegrationStatus } from "@/lib/env";
 import type { EmailLog, PullRun, Settings } from "@/lib/types";
 
@@ -16,6 +16,8 @@ type SettingsPayload = {
   latestPull: PullRun | null;
   emails: EmailLog[];
   cron: string[];
+  maxPullWindowDays: number;
+  earliestDate: string;
   integrations: IntegrationStatus;
 };
 
@@ -204,15 +206,18 @@ export function SettingsForm() {
                 id="window"
                 type="number"
                 min={1}
-                max={MAX_PULL_WINDOW_DAYS}
+                max={data?.maxPullWindowDays ?? MAX_PULL_WINDOW_DAYS}
                 value={windowDays}
                 onChange={(event) => setWindowDays(event.target.value)}
                 className="h-10"
                 required
               />
               <p className="text-sm text-muted-foreground">
-                The first pull is one month (31 days). Raise this toward {MAX_PULL_WINDOW_DAYS} days
-                when you want a backfill of up to two years, then run the pull.
+                The morning pull keeps this saved window, normally 31 days. A seven-year pull is a
+                separate step: raise the window
+                {data?.earliestDate ? ` (back to ${formatDateLabel(data.earliestDate)})` : ""}, use
+                Run pull now, then set it back to about 31 days. Choosing an older month only shows
+                transactions already stored.
               </p>
             </div>
             <div className="flex items-end">

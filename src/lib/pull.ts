@@ -32,6 +32,8 @@ export async function runDailyPull(source: "cron" | "manual"): Promise<PullResul
   }
 
   const today = sydneyDate();
+  // The morning job and Run pull now both use the saved window (default 31 days).
+  // A seven-year fetch happens only after that saved window is raised.
   const window = windowFor(today, settings.pullWindowDays);
   const run = await store.startPull({ windowFrom: window.from, windowTo: window.to });
   const notes: string[] = [];

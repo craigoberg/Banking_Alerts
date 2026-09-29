@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentMonthWindow, sydneyDate } from "@/lib/dates";
+import { currentMonthWindow, earliestSelectableDate, formatDateLabel, sydneyDate } from "@/lib/dates";
 import { jsonError, requireUser, unauthorized } from "@/lib/http";
 import { getStore, searchTransactions } from "@/lib/store";
 
@@ -17,6 +17,13 @@ export async function GET(request: Request) {
     }
     if (from > to) {
       return NextResponse.json({ error: "The start date is after the end date." }, { status: 400 });
+    }
+    const earliest = earliestSelectableDate(today);
+    if (from < earliest || to < earliest) {
+      return NextResponse.json(
+        { error: `Choose a date on or after ${formatDateLabel(earliest)} (seven years).` },
+        { status: 400 },
+      );
     }
     const accountId = url.searchParams.get("accountId");
     const q = url.searchParams.get("q") ?? "";

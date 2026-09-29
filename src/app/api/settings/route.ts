@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MAX_PULL_WINDOW_DAYS } from "@/lib/constants";
+import { earliestSelectableDate, maxPullWindowDays, sydneyDate } from "@/lib/dates";
 import { integrationStatus } from "@/lib/env";
 import { jsonError, requireUser, unauthorized } from "@/lib/http";
 import { cronExpressionsForSydneyHour } from "@/lib/schedule";
@@ -10,6 +10,7 @@ export async function GET() {
     const username = await requireUser();
     if (!username) return unauthorized();
     const store = await getStore();
+    const today = sydneyDate();
     const [settings, latestPull, emails] = await Promise.all([
       store.getSettings(),
       store.latestPull(),
@@ -19,6 +20,8 @@ export async function GET() {
       settings,
       latestPull,
       emails,
+      maxPullWindowDays: maxPullWindowDays(today),
+      earliestDate: earliestSelectableDate(today),
       cron: cronExpressionsForSydneyHour(settings.scheduleHour, settings.scheduleMinute),
       integrations: integrationStatus(),
     });
@@ -51,13 +54,10 @@ export async function PATCH(request: Request) {
     if (!Number.isInteger(scheduleMinute) || scheduleMinute < 0 || scheduleMinute > 59) {
       return NextResponse.json({ error: "Choose a minute from 0 to 59." }, { status: 400 });
     }
-    if (
-      !Number.isInteger(pullWindowDays) ||
-      pullWindowDays < 1 ||
-      pullWindowDays > MAX_PULL_WINDOW_DAYS
-    ) {
+    const maxDays = maxPullWindowDays(sydneyDate());
+    if (!Number.isInteger(pullWindowDays) || pullWindowDays < 1 || pullWindowDays > maxDays) {
       return NextResponse.json(
-        { error: `The pull window must be between 1 and ${MAX_PULL_WINDOW_DAYS} days.` },
+        { error: `The pull window must be between 1 and ${maxDays} days (seven years).` },
         { status: 400 },
       );
     }

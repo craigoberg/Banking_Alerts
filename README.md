@@ -29,10 +29,10 @@ npm run lint
 
 - Balances are cards. A card is marked Under while the balance is under that account’s threshold.
 - Cards start in one group named Accounts. You can create, rename, and delete groups, drag cards to reorder them or move them between groups, and collapse a group. Collapsing hides the cards and keeps the header. Transactions stay in one list.
-- Transactions filter by account, month, and date. The month control uses Australia/Sydney. The current month runs from the 1st through today. Earlier months are the full calendar month, and the control does not move into a future month. Search matches every column, including description, reference, merchant, category, status, direction, and amount.
+- Transactions filter by account, month, and date. Opening the app shows the current month to date in Australia/Sydney: the 1st through today. The month control keeps that rule for the current month. Earlier months are the full calendar month, and the control does not move into a future month or before seven years ago. Search matches every column, including description, reference, merchant, category, status, direction, and amount. Income and expense totals sit above the list and follow the account, dates, and search together. Income is the sum of positive amounts. Expenses are the sum of negative amounts.
 - Accounts can be added, renamed, or removed. Banks are records too. The first bank is Commonwealth Bank.
 - Settings change the alert recipient (default `craig@oberg.com.au`, from `alert@oberg.com.au`), the Australia/Sydney time, and the pull window.
-- The first pull covers 31 days. Raise the window up to 731 days for a later backfill of about two years, then use Run pull now.
+- The first pull covers 31 days, and the morning job keeps using that saved window. Raise the window to backfill up to seven years, use Run pull now, then set it back to about 31 days. Choosing an older date only shows transactions already stored.
 - Without a Postmark token, Run pull now logs the email that would have been sent. The screen still loads.
 
 ## Sydney database
@@ -43,7 +43,9 @@ Create a Supabase database in Craig’s existing account, region Oceania (Sydney
 
 `supabase/migrations/20260927120000_account_groups.sql`
 
-The first file creates banks, accounts, balances, transactions, thresholds, logins, alert state, settings, discovered RedBark accounts, pull history, and the email log. It seeds Commonwealth Bank and the seven nicknames. It does not insert a password or an API key. The second file adds account groups and places those nicknames in a group named Accounts. Run both, in that order.
+`supabase/migrations/20260929120000_seven_year_pull_window.sql`
+
+The first file creates banks, accounts, balances, transactions, thresholds, logins, alert state, settings, discovered RedBark accounts, pull history, and the email log. It seeds Commonwealth Bank and the seven nicknames. It does not insert a password or an API key. The second file adds account groups and places those nicknames in a group named Accounts. The third file raises the pull-window check from 731 days to 2558 days. Run all three, in that order.
 
 Then set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and create the real login:
 
@@ -57,9 +59,9 @@ After the first live pull, match each nickname to a Commonwealth Bank account on
 
 ## Schedule
 
-`vercel.json` calls `/api/cron/daily` at `0 13 * * *` and `0 14 * * *` UTC. One of those is midnight in Australia/Sydney, depending on daylight saving. The route runs only when the current Sydney time matches the hour and minute saved in the app (default 00:00). Set `CRON_SECRET` in production. Vercel should send `Authorization: Bearer <CRON_SECRET>`.
+`vercel.json` calls `/api/cron/daily` at `0 18 * * *` and `0 19 * * *` UTC. One of those is 5:00 in Australia/Sydney, depending on daylight saving. The route runs only when the current Sydney time matches the hour and minute saved in the app (default 05:00). Set `CRON_SECRET` in production. Vercel should send `Authorization: Bearer <CRON_SECRET>`.
 
-If the saved time is not midnight, copy the cron expressions shown on Settings into `vercel.json` and redeploy. Two daily cron entries may need a Vercel plan that allows more than one run per day.
+If the saved time is not 5:00, copy the cron expressions shown on Settings into `vercel.json` and redeploy. Two daily cron entries may need a Vercel plan that allows more than one run per day.
 
 ## Environment
 

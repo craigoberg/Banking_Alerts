@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { describeMonthScroller, monthWindow, stepMonth } from "./dates";
+import {
+  addDays,
+  currentMonthWindow,
+  describeMonthScroller,
+  earliestSelectableDate,
+  maxPullWindowDays,
+  monthWindow,
+  stepMonth,
+  windowFor,
+} from "./dates";
 
 const today = "2026-09-27";
 
@@ -38,4 +47,23 @@ test("manual dates stay custom and still cannot step into the future", () => {
   assert.equal(described.canGoNext, false);
   assert.equal(stepMonth("2027-01-01", today, 1), null);
   assert.equal(stepMonth("2027-01-01", today, -1), null);
+});
+
+test("opening the current month is the first through today", () => {
+  const current = currentMonthWindow(today);
+  assert.equal(current.from, "2026-09-01");
+  assert.equal(current.to, today);
+  assert.equal(current.isCurrent, true);
+});
+
+test("lookback stops at seven calendar years, including a leap day", () => {
+  assert.equal(earliestSelectableDate(today), "2019-09-27");
+  assert.equal(earliestSelectableDate("2024-02-29"), "2017-02-28");
+  const maxDays = maxPullWindowDays(today);
+  assert.equal(windowFor(today, maxDays).from, "2019-09-27");
+  assert.equal(windowFor(today, maxDays + 400).from, "2019-09-27");
+  assert.equal(windowFor(today, 31).from, addDays(today, -30));
+  assert.equal(stepMonth("2019-11-01", today, -1)?.from, "2019-10-01");
+  assert.equal(stepMonth("2019-10-01", today, -1), null);
+  assert.equal(describeMonthScroller("2019-10-01", "2019-10-31", today).canGoPrevious, false);
 });

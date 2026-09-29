@@ -19,7 +19,9 @@ export const SCHEDULE_TIMEZONE = "Australia/Sydney";
 export const DEFAULT_SCHEDULE_HOUR = 5;
 export const DEFAULT_SCHEDULE_MINUTE = 0;
 export const DEFAULT_PULL_WINDOW_DAYS = 31;
-export const MAX_PULL_WINDOW_DAYS = 731;
+export const LOOKBACK_YEARS = 7;
+/** Inclusive days that cover seven calendar years, including two leap days. */
+export const MAX_PULL_WINDOW_DAYS = LOOKBACK_YEARS * 365 + 2 + 1;
 
 export const REDBARK_BASE = "https://api.redbark.com/v2";
 export const REDBARK_VERSION = "2026-10-01.wattle";

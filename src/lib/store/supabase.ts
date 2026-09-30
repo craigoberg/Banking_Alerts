@@ -17,6 +17,7 @@ import {
 import { STARTING_GROUP_NAME } from "@/lib/constants";
 import { verifyPassword } from "@/lib/passwords";
 import { cardsFromAccounts, StoreError, type Store } from "@/lib/store/contract";
+import { collectPages } from "@/lib/store/pages";
 import type {
   AccountGroup,
   AccountRecord,
@@ -397,19 +398,32 @@ export function supabaseStore(): Store {
       );
     },
     async listTransactions(filter) {
-      let query = db
-        .from("transactions")
-        .select(
-          "id, account_id, redbark_transaction_id, status, posted_on, description, reference, extended_description, amount_minor, currency, direction, provider_category, category, merchant_name, merchant_category_code, accounts!inner(nickname, banks!inner(name))",
-        )
-        .gte("posted_on", filter.from)
-        .lte("posted_on", filter.to)
-        .order("posted_on", { ascending: false })
-        .limit(5000);
-      if (filter.accountId) query = query.eq("account_id", filter.accountId);
-      const { data, error } = await query;
-      fail(error, "Could not list transactions.");
-      return (data ?? []).map((row) => {
+      const columns =
+        "id, account_id, redbark_transaction_id, status, posted_on, description, reference, extended_description, amount_minor, currency, direction, provider_category, category, merchant_name, merchant_category_code, accounts!inner(nickname, banks!inner(name))";
+      // Read every row in the window. One request is capped by the API max rows,
+      // and the old 5,000 limit dropped older dates before the in-memory search.
+      const data = await collectPages(async (offset, pageSize) => {
+        let query = db
+          .from("transactions")
+          .select(columns, { count: "exact" })
+          .gte("posted_on", filter.from)
+          .lte("posted_on", filter.to)
+          .order("posted_on", { ascending: false })
+          .order("id", { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (filter.accountId) query = query.eq("account_id", filter.accountId);
+        const { data: page, error, count } = await query;
+        fail(error, "Could not list transactions.");
+        return {
+          rows: page ?? [],
+          total: typeof count === "number" && Number.isFinite(count) ? count : null,
+        };
+      });
+      const ids = new Set(data.map((row) => row.id as string));
+      if (ids.size !== data.length) {
+        throw new StoreError("Could not list every transaction in that date range.", 500);
+      }
+      return data.map((row) => {
         const account = one(row.accounts as { nickname: string; banks: BankJoin } | { nickname: string; banks: BankJoin }[]);
         const bank = one(account?.banks ?? null);
         return {

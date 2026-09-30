@@ -1,7 +1,22 @@
+import { gzipSync } from "node:zlib";
 import { NextResponse } from "next/server";
 import { currentMonthWindow, earliestSelectableDate, formatDateLabel, sydneyDate } from "@/lib/dates";
 import { jsonError, requireUser, unauthorized } from "@/lib/http";
 import { getStore, searchTransactions } from "@/lib/store";
+import type { TransactionRow } from "@/lib/types";
+
+export const maxDuration = 60;
+
+const PLAIN_JSON_LIMIT = 3_000_000;
+
+function transactionPayload(rows: TransactionRow[]): {
+  transactions: TransactionRow[];
+  transactionsGzip?: string;
+} {
+  const raw = JSON.stringify(rows);
+  if (Buffer.byteLength(raw) < PLAIN_JSON_LIMIT) return { transactions: rows };
+  return { transactions: [], transactionsGzip: gzipSync(raw).toString("base64") };
+}
 
 export async function GET(request: Request) {
   try {
@@ -47,7 +62,7 @@ export async function GET(request: Request) {
       accountId: accountId && accountId !== "all" ? accountId : "all",
       cards,
       groups,
-      transactions,
+      ...transactionPayload(transactions),
       latestPull,
     });
   } catch (error) {

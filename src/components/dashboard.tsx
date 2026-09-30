@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { earliestSelectableDate, formatDateLabel, formatSydney } from "@/lib/dates";
 import { formatMoney, sumAmountTotals } from "@/lib/money";
+import { unpackTransactions } from "@/lib/transaction-payload";
 import type { AccountCard, AccountGroup, PullRun, TransactionRow } from "@/lib/types";
 
 type HomePayload = {
@@ -37,8 +38,15 @@ type HomePayload = {
   cards: AccountCard[];
   groups: AccountGroup[];
   transactions: TransactionRow[];
+  transactionsGzip?: string | null;
   latestPull: PullRun | null;
 };
+
+async function readHome(response: Response): Promise<HomePayload & { error?: string }> {
+  const body = (await response.json()) as HomePayload & { error?: string };
+  if (response.ok) body.transactions = await unpackTransactions(body);
+  return body;
+}
 
 export function Dashboard() {
   const router = useRouter();
@@ -64,7 +72,7 @@ export function Dashboard() {
     if (next.q) params.set("q", next.q);
     try {
       const response = await fetch(`/api/home?${params.toString()}`);
-      const body = (await response.json()) as HomePayload & { error?: string };
+      const body = await readHome(response);
       if (response.status === 401) {
         router.push("/login");
         return;
@@ -116,7 +124,7 @@ export function Dashboard() {
     void (async () => {
       try {
         const response = await fetch("/api/home");
-        const body = (await response.json()) as HomePayload & { error?: string };
+        const body = await readHome(response);
         if (cancelled) return;
         if (response.status === 401) {
           router.push("/login");
